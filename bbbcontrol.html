@@ -1,0 +1,358 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<!--
+BitBltBlade web control interface
+
+www.madox.net
+$Revision: 786 $
+$Date: 2010-06-22 16:01:00 +1000 (Tue, 22 Jun 2010) $
+-->
+<html>
+  <head>
+    <title>BitBltBlade</title>
+    <base href="#lsmode"/>
+    <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"/>
+    <meta content="no-cache" http-equiv="cache-control"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>  
+<!--Style Section Start-->
+    <style type="text/css">
+html {
+}
+
+body {
+  margin:           5px;
+  padding:          5px;
+  border:           none;
+  border-style:     none;
+  text-align:       center;
+  background-color: #000000;
+  font-size:        12pt;
+  font-family:      Arial,Verdana,Helvetica,sans-serif;
+  color:            #999999;
+}
+
+button, input, textarea, select, option{
+  background-color: #000440;
+  border:           solid #003399 1px;
+  overflow:         hidden;
+  font-size:        14pt;
+  font-weight:      bold;
+  color:            #FFFFFF;
+}
+
+button {
+  width:            200px;
+  padding:          5px;
+}
+
+textarea {
+  width:            100%;
+  font-weight:      normal;
+}
+
+.colourbox {
+  position:         relative;
+  border:           solid #003399 1px;
+  background-color: #000440;
+  vertical-align:   middle;
+  overflow:         hidden;
+  margin:           5px;
+  padding:          5px;
+}
+
+#redball, #greenball, #blueball{
+  height:           30px;
+  width:            30px;
+  border-radius:    15px;
+  border-radius:    50%;
+  -moz-border-radius:50%;
+  -webkit-border-radius:50%;
+  position:         relative;
+  top:              0px;
+  left:             0px;
+}
+
+#redball {
+  background-color: #FF0000;
+}
+#greenball {
+  background-color: #00FF00;
+}
+#blueball {
+  background-color: #0000FF;
+}
+
+.tabnav {
+  position:         relative;
+  width:            100%;
+  min-height:       300px;
+}
+
+.tabnav > div > a {
+  color:            #FFFFFF;
+  background-color: #000440;
+  border:           solid #003399 1px;
+  border-bottom:    solid #000440 1px;
+  position:         relative;
+  margin-left:      -1px;
+  left:             1px;
+  float:            left;
+  text-decoration:  none;
+  display:          inline;
+  padding:          5px 10px;
+}
+
+.tabnav > div:not(:target) > a {
+  background-color: #000000;
+  border-bottom:    solid #003399 1px;
+}
+	
+.tabnav > div > div {
+  z-index: 1;
+  top: 30px;
+  width: 100%;
+  border: solid #003399 1px;
+  background-color: #000440;
+  position: absolute;
+}
+	
+.tabnav > div:not(:target) > div {
+  visibility: hidden;
+}
+ 
+    </style>
+<!--Style Section End-->
+<!--Script Section Start-->
+    <script type="text/javascript">
+var dataRequest = null;
+var getStatusUrl = "/status/";
+var Status = {"status":"", "status_id":0};
+
+function requestData(){
+  dataRequest = getXMLHttpObject();
+
+  if(dataRequest == null){
+    alert("Failed to use AJAX!");
+    return false;
+  }
+
+  if(dataRequest.overrideMimeType){
+    dataRequest.overrideMimeType('application/json');
+  }
+
+  //Send the request
+  dataRequest.onreadystatechange = processData;
+  dataRequest.open('GET', getStatusUrl+Status["status_id"], true);
+  dataRequest.send(null);
+}
+
+function setStatusText(text){
+  document.getElementById("statustext").innerHTML = text;
+}
+  
+function processData(){
+  if(dataRequest.readyState == 4){
+    if(dataRequest.status == 200){
+      try {
+        eval(dataRequest.responseText);
+        setStatusText(dataRequest.responseText)
+      } catch (e) {
+        alert(e.message);
+      }
+      requestData();
+    }
+  }
+}
+
+function getXMLHttpObject()
+{
+  var xmlHttp=null;
+  try {
+    //New Browsers, Firefox, Safari, IE7+, Chrome
+    xmlHttp=new XMLHttpRequest();
+  } catch (e) {
+    alert("Don't use IE...");
+  }
+  return xmlHttp;
+}
+
+var mouseOriginX = 0;
+var mouseOriginY = 0;
+var ballSize = 30;
+var ballMargin = 5;
+
+var lastCommandTime = 0;
+
+function getCoords(evt){
+  var coords = [];
+  if(evt.touches && evt.touches.length){
+    coords[0]=evt.touches[0].clientX;
+    coords[1]=evt.touches[0].clientY;
+  } else {
+    coords[0]=evt.clientX;
+    coords[1]=evt.clientY;
+  }
+  return coords;
+}
+
+function mouseDown(evt){
+  //Start
+  var cursorPos = getCoords(evt);
+  mouseOriginX = cursorPos[0];
+  targetName = evt.target.id;
+  targetBall = document.getElementById(targetName);
+  targetOriginX = targetBall.offsetLeft;
+  document.onmousemove = document.ontouchmove = mouseMove;
+  return false;
+}
+
+function mouseMove(evt){
+  var cursorPos = getCoords(evt);
+  var deltaPosX = cursorPos[0] - mouseOriginX;
+  var rightLimit = targetBall.parentNode.offsetWidth - ballSize - 2 * ballMargin;
+  var newPosX = targetOriginX - ballMargin + deltaPosX;
+  
+  if(newPosX >=0 && newPosX <= rightLimit){
+    targetBall.style.left = newPosX + "px";
+    var scaledValue = Math.floor(255 * targetBall.offsetLeft / rightLimit);
+    if(targetName == "redball"){
+      //Red
+      document.getElementById("red").value = scaledValue;
+    } else if (targetName == "greenball"){
+      //Green
+      document.getElementById("green").value = scaledValue;
+    } else {
+      //Blue
+      document.getElementById("blue").value = scaledValue;
+    }
+    
+    date = new Date();
+    currentTime = date.getTime();
+    //Limit command rate to 4Hz to avoid spamming the controller
+    if(currentTime-lastCommandTime > 250){
+      lastCommandTime = currentTime;
+      //Submit the form
+      targetBall.parentNode.parentNode.submit();
+    }
+  }
+}
+
+function mouseUp(evt){
+  //Check if there was a recent command, if so then there might be an 
+  //unsent command (due to rate limit).  Send it.
+  date = new Date();
+  currentTime = date.getTime();
+  if(currentTime-lastCommandTime <= 250){
+    targetBall.parentNode.parentNode.submit();
+  }
+  document.onmousemove = document.ontouchmove = null;  
+}
+
+function init(){
+  redBall = document.getElementById("redball");
+  greenBall = document.getElementById("greenball");
+  blueBall = document.getElementById("blueball");
+  
+  setStatusText(redBall.offsetLeft + " " + redBall.offsetWidth);
+  
+  redBall.onmousedown = redBall.ontouchstart = mouseDown;
+  greenBall.onmousedown = greenBall.ontouchstart = mouseDown;
+  blueBall.onmousedown = blueBall.ontouchstart = mouseDown;
+  
+  document.onmouseup = document.ontouchend = mouseUp;
+  
+  var max_height = 24;
+  var select = document.getElementById("pixelselect");
+  for (var i=0; i < max_height; i++){
+    select.options[select.options.length] = new Option(i, i);
+  }
+}
+
+function setLightColour(red,green,blue){
+  document.getElementById("redlight").value = red;
+  document.getElementById("greenlight").value = green;
+  document.getElementById("bluelight").value = blue;
+}
+//--------------------------------------------------------------------//
+//SCRIPT SECTION ENDS
+//--------------------------------------------------------------------//
+    </script>
+<!--Script Section End-->
+  </head>
+  <body onLoad="init();requestData();">
+    <div>Status/Debug messages</div>
+    <textarea id="statustext" rows="3">test</textarea>
+    <div>Select an option</div>
+    <div class="tabnav">
+      <div id="lsmode">
+        <a href="#lsmode">LS Mode</a>
+        <div>
+          <div>1. Choose your Image file and then press upload</div>
+          <form target="hidden" action="postdata/" enctype="multipart/form-data" method="post">
+            <input type="file" name="imagefile" size="50"/>
+            <input type="submit" value="Upload"/>
+          </form>
+          <form target="hidden" action="postdata/" enctype="multipart/form-data" method="post">
+            <div>2. Select column playback interval</div>
+            <select name="interval" onchange="this.form.submit();">
+              <option value="0.02">20ms</option>
+              <option value="0.03">30ms</option>
+              <option value="0.04">40ms</option>
+              <option value="0.05" selected="selected">50ms</option>
+              <option value="0.06">60ms</option>
+              <option value="0.07">70ms</option>
+              <option value="0.08">80ms</option>
+            </select>
+            <div>3. Press Play when ready</div>
+          </form>
+          <form target="hidden" action="postdata/" enctype="multipart/form-data" method="post">
+            <input type="submit" name="play" value="play"/>
+          </form>
+        </div>
+      </div>
+      <div id="colourmode">
+        <a href="#colourmode">Colour Mode</a>
+        <div>
+          <form target="hidden" action="postdata/" enctype="multipart/form-data" method="post">
+            <input type="hidden" name="red"   id="red"   value="0"/>
+            <input type="hidden" name="green" id="green" value="0"/>
+            <input type="hidden" name="blue"  id="blue"  value="0"/>
+            <div class="colourbox">
+              <div id="redball"></div>
+            </div>
+            <div class="colourbox">
+              <div id="greenball"></div>
+            </div>
+            <div class="colourbox">
+              <div id="blueball"></div>
+            </div>
+            Select pixel(s):
+            <select id="pixelselect" name="pixel">
+              <option value="-1" selected="selected">All</option>
+            </select>
+          </form>
+        </div>
+      </div>
+      <div id="lightmode">
+        <a href="#lightmode">Light Mode</a>
+        <div>
+          <form target="hidden" action="postdata/" enctype="multipart/form-data" method="post">
+            <input type="hidden" name="red"   id="redlight"   value="0"/>
+            <input type="hidden" name="green" id="greenlight" value="0"/>
+            <input type="hidden" name="blue"  id="bluelight"  value="0"/>
+            <input type="hidden" name="pixel" value="-1"/>
+            <button type="button" onclick="setLightColour(255,  0,  0);this.form.submit();">Red</button>
+            <button type="button" onclick="setLightColour(  0,255,  0);this.form.submit();">Green</button>
+            <button type="button" onclick="setLightColour(  0,  0,255);this.form.submit();">Blue</button>
+            <button type="button" onclick="setLightColour(255,255,  0);this.form.submit();">Yellow</button>
+            <button type="button" onclick="setLightColour(255,255,255);this.form.submit();">100% (On)</button>
+            <button type="button" onclick="setLightColour( 64, 64, 64);this.form.submit();">25% (On)</button>
+            <button type="button" onclick="setLightColour( 26, 26, 26);this.form.submit();">10% (On)</button>
+            <button type="button" onclick="setLightColour( 13, 13, 13);this.form.submit();">5% (On)</button>
+            <button type="button" onclick="setLightColour(  0,  0,  0);this.form.submit();">0% (Off)</button>
+          </form>
+        </div>
+      </div> 
+    </div>
+    <iframe id="hidden" name="hidden" style="visibility:hidden"></iframe>
+  </body>
+</html>

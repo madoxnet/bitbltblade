@@ -1,0 +1,27 @@
+= Loightscythe =
+
+The loightscythe is a device for generating images superimposed on 
+backgrounds using long exposure photography.  The concept is based on 
+Gavin Smith's lightscythe :
+[https://sites.google.com/site/mechatronicsguy/lightscythe/]
+
+The name is intended to be distinct, yet related.  A google search for
+loightscythe should also point to Gavin's webpage instead of mine.
+See [http://en.wikipedia.org/wiki/Norfolk_dialect] for the origin of 
+"loight".
+
+== Pre-requisites ==
+* Madox Standard TL-WR703N Image
+* Edit /etc/config/uhttpd to change Luci to port 8080
+* Kean's TL-WR703N Expander Board
+
+== Setup ==
+* Connect the LED strip to power
+* Make the following connections from LED strip to Kean's Board
+DO -> (TDI/DO) -> ADBUS1 -> RXI
+CLK -> (TCK/SK) -> ADBUS0 -> TXO
+GND -> GND
+
+== Usage ==
+* Connect your phone/computer to the Loightscythe AP
+* 

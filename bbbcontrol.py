@@ -36,7 +36,7 @@ import SocketServer
 import struct
 import usb1
 
-#IRToy imports
+#somfy imports
 import serial
 
 #Python Imaging
@@ -46,8 +46,9 @@ class BBBControl():
   """
   BitBltBlade Control Class
   This handles the hardware side of things including the FTDI MPSSE for
-  communications with the WS2801 LED strips as well as the IR Toy.
+  communications with the WS2801 LED strips as well as the Somfy Remote.
   """
+
   def __init__(self):
     """
     Initialise the FTDI 2232L (D) on Kean's expander board for MPSSE
@@ -57,8 +58,8 @@ class BBBControl():
     #Initialize the FTDI
     self.init_ftdi_mpsse()
     
-    #Init the IRToy
-    self.init_irtoy()
+    #Init the somfy
+    self.init_somfy()
     
     #Initialise the GUI interface bits
     self.status_updated = threading.Condition()
@@ -69,7 +70,7 @@ class BBBControl():
     self.column_index = 0
     self.column_interval = 0.05
     self.image_loaded = False
-    self.max_height = 24 #Change this depending on size of strip
+    self.max_height = 95 #Change this depending on size of strip
 
     self.r_idx = 2 #My WS2801 strip  has R & B swapped, R is normally 0
     self.g_idx = 1
@@ -79,34 +80,55 @@ class BBBControl():
     self.black_column = self.max_height * black_pixel
     self.column_buffer = self.max_height * [black_pixel]
     
-  def init_irtoy(self):
-    #Configure the IRToy Serial Ports
+    self.somfy_reset = struct.pack("B13s", 13, "\x00")
+    self.somfy_getstatus = struct.pack("B2sBB9s", 13, "", 0x01, 0x02, "")
+    
+  def init_somfy(self):
+    #Configure the somfy Serial Ports
     self.ser            = serial.Serial()
-    self.ser.port       = "/dev/ttyACM0" #This is the default for IRToy
-    self.ser.baudrate   = 115200
+    self.ser.port       = "/dev/ttyUSB0" #This is the default for somfy
+    self.ser.baudrate   = 38400
     self.ser.bytesize   = 8
     self.ser.parity     = serial.PARITY_NONE
     self.ser.stopbits   = 1
     self.ser.xonxoff    = False
     self.ser.rtscts     = False
     
-    self.irtoy_present = True
+    self.somfy_present = True
     try:
       self.ser.open()
       self.ser.flushInput()
       self.ser.flushOutput()
+      self.ser.write(self.somfy_reset)
+      time.sleep(1)
+      self.ser.flushInput()
+      buffer = ser.read(2048)
+      ser.write(self.somfy_getstatus)
+      buffer = ser.read(2048)
     except:
-      self.irtoy_present = False
+      self.somfy_present = False
       
-  def send_shutter(self):
-    if self.irtoy_present == True:
-      #Send Sony Shutter
-      self.ser.write("\x00n\x00\x1d\x006\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1d\x006\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1c\x00\x1c\x00\x1c\x00\x1b\x00\x1c\x006\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1c\x006\x00\x1c\x006\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1c\x006\x00\x1c\x006\x00\x1c\x006\x02$\x00n\x00\x1d\x006\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1c\x006\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1d\x00\x1b\x00\x1c\x00\x1b\x00\x1c\x006\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1c\x006\x00\x1c\x006\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x00\x1c\x006\x00\x1c\x006\x00\x1c\x006\x00\x1c\x006\xff\xff")
-      #Send Canon Shutter
-      self.ser.write("insert codes here")
-      #Send Nikon Shutter
-      self.ser.write("insert codes here")
-    
+  def somfy_string(self, unit_id, unit_code, command):
+    return struct.pack(">5BH6B",
+                        0x0C,   #Packet Length
+                        0x1A, #Packet Type
+                        0x00, #Sub-Type
+                        0x00, #Sequence Number
+                        0x00, #ID Dummy
+                        unit_id, #unit_id as 16bit int
+                        unit_code, #Unit Code
+                        command, #Command
+                        0x00, #Reserved 1
+                        0x00, #Reserved 2
+                        0x00, #Reserved 3
+                        0x00 #RSSI N/A
+                      )
+
+  def somfy_command(self, unit, unit_code, command):
+    #ser.write(somfy_string(MADOX_UNIT_ID, 3, CMD_DOWN))
+    self.ser.write(self.somfy_string(unit, unit_code, command))
+    self.update_status("Info: Blind command (%d,%d,%d)" % (unit, unit_code, command))
+   
   def init_ftdi_mpsse(self):
     """
     FTDI MPSSE Initialization
@@ -296,6 +318,18 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       except:
         self.send_error(404, "Banana Not Found.")
         self.end_headers()
+    elif self.path == "/icon/":
+      try:
+        f = open("bbbcontrol.png", "r")
+        response = f.read()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
+        f.close()
+      except:
+        self.send_error(404, "Banana Not Found.")
+        self.end_headers()
     elif self.path[:8] == "/status/":
       try:
         request_id = int(self.path[8:])
@@ -335,6 +369,13 @@ class HTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       elif form.has_key("play"):
         #Indicates LS mode already
         self.server.bbb_control.play_image()
+      elif ( form.has_key("blind") and 
+             form.has_key("unit") and 
+             form.has_key("command") ):
+        blind=int(form["blind"].value)
+        command=int(form["command"].value)
+        unit_id=int(form["unit"].value)
+        self.server.bbb_control.somfy_command(unit_id, blind, command)
       elif ( form.has_key("red") and 
              form.has_key("green") and
              form.has_key("blue") and
@@ -379,3 +420,4 @@ if __name__ == '__main__':
   except KeyboardInterrupt:
     #Exit
     http_server.shutdown()
+
